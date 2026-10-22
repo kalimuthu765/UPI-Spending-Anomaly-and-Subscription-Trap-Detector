@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+frontend/node_modules/
+frontend/dist/
+data/raw/upi_transactions_2024.csv
+upi_app.db
+mlops/mlflow/mlflow.db
+mlruns/
+*.md
+notebooks/
+tests/

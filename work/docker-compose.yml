@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: upi_db
+      POSTGRES_USER: upi_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U upi_user -d upi_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://upi_user:${POSTGRES_PASSWORD:-changeme}@postgres:5432/upi_db
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      # persist per-user personal models and the MLflow tracking store
+      # across container restarts/rebuilds
+      - ./ml/artifacts/user_models:/app/ml/artifacts/user_models
+      - ./mlops/mlflow:/app/mlops/mlflow
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+  # Optional: MLflow tracking UI (Phase 7), reusing the backend image so
+  # it has mlflow + the same dependencies installed — just overrides the
+  # command. Shares the same sqlite tracking store via the mounted volume.
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////app/mlops/mlflow/mlflow.db
+      --default-artifact-root /app/mlops/mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlops/mlflow:/app/mlops/mlflow
+
+volumes:
+  pg_data:

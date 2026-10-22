@@ -1,0 +1,24 @@
+{
+    "project": "UPI Transaction Anomaly Detection",
+    "created_at": "2026-09-28T22:06:17.389023",
+    "datasets": {
+        "dataset1": {
+            "records": 250000,
+            "features": 22,
+            "ensemble_anomalies": 278,
+            "anomaly_percentage": 0.1112
+        },
+        "dataset2": {
+            "records": 620,
+            "features": 14,
+            "ensemble_anomalies": 28,
+            "anomaly_percentage": 4.5161
+        },
+        "dataset3": {
+            "records": 500,
+            "features": 14,
+            "ensemble_anomalies": 18,
+            "anomaly_percentage": 3.6
+        }
+    }
+}
