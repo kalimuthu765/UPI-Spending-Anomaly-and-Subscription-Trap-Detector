@@ -40,6 +40,7 @@ services:
     depends_on:
       - backend
     ports:
+      - "80:80"
       - "5173:80"
 
   # Optional: MLflow tracking UI (Phase 7), reusing the backend image so

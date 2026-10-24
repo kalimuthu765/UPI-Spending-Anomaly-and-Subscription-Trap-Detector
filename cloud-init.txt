@@ -1,0 +1,17 @@
+#cloud-config
+package_upgrade: true
+packages:
+  - git
+  - curl
+  - docker.io
+  - docker-compose-v2
+
+runcmd:
+  - fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+  - chmod 600 /swapfile
+  - mkswap /swapfile
+  - swapon /swapfile
+  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  - systemctl enable --now docker
+  - git clone https://github.com/kalimuthu765/UPI-Spending-Anomaly-and-Subscription-Trap-Detector.git /opt/upi-app
+  - cd /opt/upi-app/work && docker compose up -d --build
