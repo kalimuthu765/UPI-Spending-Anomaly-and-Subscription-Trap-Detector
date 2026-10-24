@@ -49,6 +49,20 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+
+class StripApiPrefixMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.scope.get("path", "")
+        if path.startswith("/api/"):
+            request.scope["path"] = path[4:]
+        elif path == "/api":
+            request.scope["path"] = "/api-info"
+        return await call_next(request)
+
+app.add_middleware(StripApiPrefixMiddleware)
+
 
 @app.on_event("startup")
 def on_startup():
@@ -363,8 +377,8 @@ def model_status():
     }
 
 
-@app.get("/")
-def root():
+@app.get("/api-info")
+def api_info():
     return {
         "message": "UPI Anomaly & Subscription Detector API",
         "flow": "POST /auth/register -> POST /auth/login -> POST /upload/history (with Bearer token) "
@@ -372,3 +386,36 @@ def root():
         "no_login_flow": "POST /upload/quick-analysis (no account, nothing saved)",
         "docs": "/docs",
     }
+
+
+FRONTEND_DIST = os.path.join(PROJECT_ROOT, "frontend", "dist")
+
+
+@app.get("/")
+def root():
+    index_file = os.path.join(FRONTEND_DIST, "index.html")
+    if os.path.exists(index_file):
+        from starlette.responses import FileResponse
+        return FileResponse(index_file)
+    return api_info()
+
+
+if os.path.exists(FRONTEND_DIST):
+    from fastapi.staticfiles import StaticFiles
+    from starlette.responses import FileResponse
+
+    assets_dir = os.path.join(FRONTEND_DIST, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        if full_path in ("docs", "redoc", "openapi.json"):
+            raise HTTPException(404)
+        file_path = os.path.join(FRONTEND_DIST, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        index_file = os.path.join(FRONTEND_DIST, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {"message": "Not found"}

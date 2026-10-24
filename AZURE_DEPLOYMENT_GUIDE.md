@@ -1,129 +1,111 @@
-# ☁️ Azure Deployment Guide (Azure for Students)
+# 🐳 Azure Docker Deployment Guide (Azure Container Apps & App Service)
 
-This guide walks you step-by-step through deploying the **UPI Spending Anomaly and Subscription Trap Detector** on Microsoft Azure using your **Azure Student Free Account**.
+This guide shows how to deploy the **UPI Spending Anomaly & Subscription Trap Detector** using **Docker** on Microsoft Azure with your **Azure Student Free Account**.
 
----
-
-## 💡 Overview of Deployment Architecture
-
-- **Hosting Platform**: Azure Virtual Machine (Ubuntu 22.04 LTS, Standard_B2s or Standard_B1s)
-- **Container Stack**: Docker & Docker Compose
-  - **Frontend**: React + Vite + Nginx (Port 80)
-  - **Backend**: FastAPI ML API (Proxied via Nginx on `/api/`, direct on Port 8000)
-  - **Database**: PostgreSQL (Containerized) or SQLite (Internal)
-  - **ML Model Engine**: Scikit-Learn Isolation Forest & Subscription Trap Detector
-  - **MLflow Tracking**: Experiment tracking dashboard (Port 5000)
-- **Cost**: **$0.00** (100% covered by your Azure for Students $100 credit / 12-month free services)
+Both the **React Frontend** and **FastAPI Backend + ML Engine** are packaged into a **single unified production Docker container**. This means you only need to run **one container**, completely eliminating multi-container configuration overhead, CORS issues, and extra cloud hosting costs.
 
 ---
 
-## 🚀 Quick Step-by-Step Deployment (Azure Portal)
+## 🏗️ Architecture
 
-### Step 1: Open Azure Portal
-1. Navigate to [portal.azure.com](https://portal.azure.com) in your web browser.
-2. Sign in with your Azure Student account.
-
----
-
-### Step 2: Create a Virtual Machine
-1. In the top search bar, type **Virtual machines** and select it.
-2. Click **+ Create** ➔ **Azure virtual machine**.
-
-#### **A. Basics Tab**
-- **Subscription**: Select **Azure for Students**
-- **Resource group**: Click **Create new** ➔ name it `upi-detector-rg` ➔ click **OK**
-- **Virtual machine name**: `upi-detector-vm`
-- **Region**: Choose a region near you (e.g., `Central India`, `Southeast Asia`, or `East US`)
-- **Availability options**: `No infrastructure redundancy required`
-- **Security type**: `Standard`
-- **Image**: **Ubuntu Server 22.04 LTS - x64 Gen2**
-- **Size**: 
-  - Select **Standard_B2s** (2 vCPUs, 4 GiB RAM — Recommended for fast ML container building, costs ~$0.04/hr which is well within the $100 student credit)
-  - *OR* **Standard_B1s** (1 vCPU, 1 GiB RAM — eligible for 12 months free tier)
-- **Administrator account**:
-  - Authentication type: Select **Password**
-  - Username: `azureuser`
-  - Password: Create a strong password (e.g. `UpiStudent2026!`)
-- **Inbound port rules**:
-  - Public inbound ports: **Allow selected ports**
-  - Select inbound ports: Check **SSH (22)** and **HTTP (80)**
-
-#### **B. Advanced Tab (Automatic Zero-Touch Setup)**
-1. Click on the **Advanced** tab at the top.
-2. Scroll down to **Custom data and cloud-init** (or **Custom data**).
-3. Paste the following configuration directly into the box:
-
-```yaml
-#cloud-config
-package_upgrade: true
-packages:
-  - git
-  - curl
-  - docker.io
-  - docker-compose-v2
-
-runcmd:
-  - fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
-  - chmod 600 /swapfile
-  - mkswap /swapfile
-  - swapon /swapfile
-  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
-  - systemctl enable --now docker
-  - git clone https://github.com/kalimuthu765/UPI-Spending-Anomaly-and-Subscription-Trap-Detector.git /opt/upi-app
-  - cd /opt/upi-app/work && docker compose up -d --build
+```
+                                  [ User Browser ]
+                                         │
+                                   HTTP Port 80
+                                         │
+                          ┌──────────────▼──────────────┐
+                          │   Unified Docker Container  │
+                          │                             │
+                          │   FastAPI + Starlette       │
+                          │   ├── / ➔ React Frontend    │
+                          │   ├── /assets/ ➔ Static JS  │
+                          │   ├── /api/* ➔ ML & DB API  │
+                          │   └── /docs ➔ Swagger API   │
+                          │                             │
+                          │   SQLite / Models Embedded  │
+                          └─────────────────────────────┘
 ```
 
-#### **C. Review + Create**
-1. Click **Review + create** at the bottom.
-2. Wait for validation to pass, then click **Create**.
-3. Azure will take 1–2 minutes to provision the VM.
+---
+
+## 🚀 Method 1: Azure Container Apps (Recommended — 100% Free)
+
+Azure Container Apps has a permanent free tier each month:
+- **180,000 vCPU-seconds** free
+- **360,000 GiB-seconds** free
+- **2 Million requests** free
+
+### Step 1: Open Azure Portal
+1. Navigate to [portal.azure.com](https://portal.azure.com).
+2. In the top search bar, search for **Container Apps** and click **+ Create** ➔ **Container App**.
+
+### Step 2: Configure Basics
+- **Subscription**: Select **Azure for Students**
+- **Resource group**: Click **Create new** ➔ `upi-detector-rg`
+- **Container app name**: `upi-detector-app`
+- **Region**: Choose a region with Container Apps support (e.g. `East US`, `Southeast Asia`, `Central US`)
+- **Container Apps Environment**: Click **Create new** (keep default consumption plan)
+
+### Step 3: Configure Container
+- Under **Image source**, you can choose:
+  - **Quickstart image** (or choose your container registry)
+  - Or select **Docker Hub or other registries**:
+    - **Image type**: Public
+    - **Registry login server**: `ghcr.io`
+    - **Image and tag**: `ghcr.io/kalimuthu765/upi-spending-anomaly-and-subscription-trap-detector:latest`
+- **CPU and Memory**: Select `0.5 vCPU, 1.0 GiB RAM` (covered under free monthly quota)
+
+### Step 4: Configure Ingress (Web Access)
+1. Click the **Ingress** tab:
+   - **Ingress**: Select **Enabled**
+   - **Ingress traffic**: Select **Accepting traffic from anywhere**
+   - **Target port**: Enter `80`
+   - **Transport**: `Auto` (or `HTTP/1.1`)
+2. Click **Review + create** ➔ **Create**.
+3. Once provisioned, click **Go to resource** and copy your **Application URL** (e.g., `https://upi-detector-app.xxxx.azurecontainerapps.io`).
+4. Open the URL in your browser to access the live app!
 
 ---
 
-### Step 3: Access Your Live Application!
-1. When deployment completes, click **Go to resource**.
-2. Under the **Overview** section, look for **Public IP address** (e.g. `20.198.xxx.xxx`).
-3. Allow 2–3 minutes after VM launch for Docker to finish building the app.
-4. In your browser, open:
-   ```text
-   http://<YOUR_VM_PUBLIC_IP>/
-   ```
-5. You will see the **UPI Spending Anomaly & Subscription Trap Detector** React dashboard!
+## 🌐 Method 2: Azure App Service (Web App for Containers)
+
+If you prefer Azure App Service:
+1. In Azure Portal, search for **App Services** and click **+ Create** ➔ **Web App**.
+2. **Basics Tab**:
+   - **Subscription**: `Azure for Students`
+   - **Resource group**: `upi-detector-rg`
+   - **Name**: `upi-detector-web` (must be globally unique)
+   - **Publish**: Select **Container**
+   - **Operating System**: **Linux**
+   - **Region**: Same as resource group
+   - **Pricing Plan**: Select **Free F1** or **Basic B1** (covered by your $100 student credit)
+3. **Container Tab**:
+   - **Image Source**: **Other container registries**
+   - **Access Type**: **Public**
+   - **Registry options**: Enter registry server `ghcr.io` and image `ghcr.io/kalimuthu765/upi-spending-anomaly-and-subscription-trap-detector:latest`
+4. **Environment / Port Configuration**:
+   - Go to **Configuration** / **Environment variables** after creation.
+   - Add app setting: `WEBSITES_PORT` = `80`
+5. Save and open your `https://upi-detector-web.azurewebsites.net` URL!
 
 ---
 
-## 🛠️ Alternative Method: Azure Portal "Run Command" (No SSH Required)
+## 💻 Testing / Running with Docker Locally
 
-If you didn't paste the cloud-init script or want to run deployment manually without an SSH client:
-1. In the Azure Portal, open your VM (`upi-detector-vm`).
-2. On the left sidebar menu, scroll down to **Operations** ➔ click **Run command**.
-3. Select **RunShellScript**.
-4. Paste this single command into the script window:
-   ```bash
-   git clone https://github.com/kalimuthu765/UPI-Spending-Anomaly-and-Subscription-Trap-Detector.git /opt/upi-app && bash /opt/upi-app/deploy.sh
-   ```
-5. Click **Run**. Azure executes the full build and start script directly on the VM.
+To build and run the unified container locally on your own computer:
 
----
+```powershell
+# From the project root:
+docker build -t upi-detector .
 
-## 🌐 Opening Additional Ports (Optional: Swagger Docs & MLflow)
+# Run the container:
+docker run -d -p 80:80 --name upi-app upi-detector
 
-If you want to view FastAPI Swagger Docs (port 8000) or the MLflow UI (port 5000):
-1. On your VM page in Azure Portal, go to **Settings** ➔ **Networking** (or **Network settings**).
-2. Click **Add inbound port rule**:
-   - **Destination port ranges**: `8000,5000`
-   - **Protocol**: `TCP`
-   - **Action**: `Allow`
-   - **Priority**: `310`
-   - **Name**: `Allow-App-Ports`
-3. Click **Add**.
-4. You can now access:
-   - **FastAPI Swagger Docs**: `http://<YOUR_VM_PUBLIC_IP>:8000/docs`
-   - **MLflow Tracking UI**: `http://<YOUR_VM_PUBLIC_IP>:5000/`
+# Open in browser:
+http://localhost/
+```
 
----
-
-## 🛑 How to Stop or Restart to Save Student Credits
-
-- To stop the VM when not in use: Click **Stop** at the top of the VM page in Azure Portal (Status will change to *Deallocated*, so you won't be charged for compute).
-- To resume: Click **Start**. The Docker containers will automatically start up with the system.
+To stop the container:
+```powershell
+docker stop upi-app && docker rm upi-app
+```

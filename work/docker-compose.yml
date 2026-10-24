@@ -22,6 +22,7 @@ services:
     environment:
       DATABASE_URL: postgresql://upi_user:${POSTGRES_PASSWORD:-changeme}@postgres:5432/upi_db
       SECRET_KEY: ${SECRET_KEY:-dev-secret-change-in-production}
+      PORT: 8000
     depends_on:
       postgres:
         condition: service_healthy
